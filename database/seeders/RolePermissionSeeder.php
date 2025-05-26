@@ -2,21 +2,18 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class RolePermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Buat permission
         $permissions = [
             'manage users',
             'create project',
@@ -28,27 +25,19 @@ class RolePermissionSeeder extends Seeder
             'view dashboard',
         ];
 
+        // Create permissions only if they don't exist
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'api']);
         }
 
-        // Buat role
-        $admin = Role::firstOrCreate(['name' => 'Admin']);
-        $pm = Role::firstOrCreate(['name' => 'Project Manager']);
-        $tm = Role::firstOrCreate(['name' => 'Team Member']);
-
-        // Assign permission ke role Admin
-        $admin->syncPermissions([
-            'manage users',
-            'create project',
-            'update project',
-            'delete project',
-            'comment tasks',
-            'view dashboard',
-        ]);
-
-        // Assign permission ke role Project Manager
-        $pm->syncPermissions([
+        // Create roles only if they don't exist
+        $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'api']);
+        $managerRole = Role::firstOrCreate(['name' => 'Project Manager', 'guard_name' => 'api']);
+        $memberRole = Role::firstOrCreate(['name' => 'Team Member', 'guard_name' => 'api']);
+        // Sync permissions to roles (this will replace existing permissions)
+        $adminRole->syncPermissions(Permission::all());
+        
+        $managerRole->syncPermissions([
             'create project',
             'update project',
             'assign tasks',
@@ -57,11 +46,46 @@ class RolePermissionSeeder extends Seeder
             'view dashboard',
         ]);
 
-        // Assign permission ke role Team Member
-        $tm->syncPermissions([
+        $memberRole->syncPermissions([
             'update tasks',
             'comment tasks',
             'view dashboard',
         ]);
+
+        // Create users only if they don't exist
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin',
+                'password' => Hash::make('password'),
+            ]
+        );
+        if (!$admin->hasRole('Admin')) {
+            $admin->assignRole('Admin');
+        }
+
+        $manager = User::firstOrCreate(
+            ['email' => 'pm@gmail.com'],
+            [
+                'name' => 'Project Manager',
+                'password' => Hash::make('password'),
+            ]
+        );
+        if (!$manager->hasRole('Project Manager')) {
+            $manager->assignRole('Project Manager');
+        }
+
+        $member = User::firstOrCreate(
+            ['email' => 'tm@gmail.com'],
+            [
+                'name' => 'Team Member',
+                'password' => Hash::make('password'),
+            ]
+        );
+        if (!$member->hasRole('Team Member')) {
+            $member->assignRole('Team Member');
+        }
+
+        $this->command->info('Roles and permissions seeded successfully!');
     }
 }
